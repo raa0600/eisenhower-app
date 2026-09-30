@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f4f2">
+<title>Mis tareas · Matriz de Eisenhower</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --black: #0a0a0a;
+    --white: #ffffff;
+    --red:   #e30613;
+    --bg:    #f4f4f2;
+    --line:  #d6d6d2;
+    --muted: #6e6e6a;
+    --font:  "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--bg);
+    color: var(--black);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.4;
+    letter-spacing: -0.005em;
+    padding-bottom: calc(110px + env(safe-area-inset-bottom));
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body.no-scroll { overflow: hidden; }
+
+  /* ---------- Imagen de fondo lateral ---------- */
+  .bg-image {
+    position: fixed;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    width: 320px;
+    height: auto;
+    max-height: 80dvh;
+    object-fit: contain;
+    opacity: 0.7;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+  }
+
+  .app-header,
+  #board {
+    position: relative;
+    z-index: 1;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  /* ---------- Header ---------- */
+  .app-header { padding-top: calc(env(safe-area-inset-top) + 18px); }
+
+  .header-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--black);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .mark { width: 10px; height: 10px; background: var(--red); display: inline-block; }
+
+  h1 {
+    margin: 0;
+    padding: 22px 0 26px;
+    font-size: clamp(46px, 14.5vw, 88px);
+    font-weight: 700;
+    line-height: 0.88;
+    letter-spacing: -0.045em;
+    text-transform: uppercase;
+  }
+
+  /* ---------- Tabs ---------- */
+  .tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--black);
+    border-bottom: 1px solid var(--black);
+  }
+  .tabs button {
+    appearance: none;
+    background: transparent;
+    border: none;
+    padding: 14px 0;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+    text-align: left;
+    position: relative;
+    transition: color .15s;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .tabs button:first-child { padding-right: 12px; border-right: 1px solid var(--black); }
+  .tabs button:last-child { padding-left: 12px; }
+  .tabs button[aria-pressed="true"] { color: var(--black); }
+  .tabs button[aria-pressed="true"]::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: -1px;
+    height: 3px;
+    background: var(--red);
+  }
+  .tabs .badge { font-weight: 700; color: inherit; letter-spacing: 0.08em; }
+
+  /* ---------- Board ---------- */
+  #board { padding-top: 0; counter-reset: sec; }
+
+  /* ---------- Quadrant con barra de color al lado ---------- */
+  .quadrant {
+    counter-increment: sec;
+    position: relative;
+    padding: 26px 0 4px 18px;   /* deja espacio para la barra a la izquierda */
+    margin-top: 6px;
+  }
+
+  /* Barra vertical con el color de la categoría */
+  .quadrant::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 26px;
+    bottom: 4px;
+    width: 4px;
+    background: var(--qc, var(--black));
+  }
+
+  .q-head,
+  .completed-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1.5px solid var(--black);
+  }
+  .q-dot { display: none; }
+  .q-head::before,
+  .completed-head::before {
+    content: counter(sec, decimal-leading-zero);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--black);
+  }
+  .q-title {
+    flex: 1;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--black);
+  }
+  .q-count {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  .q-list,
+  .completed-list { display: flex; flex-direction: column; }
+
+  /* ---------- Task ---------- */
+  .task {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 0;
+    border-bottom: 1px solid var(--line);
+    animation: fade .18s ease both;
+  }
+  @keyframes fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .check {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1.5px solid var(--black);
+    border-radius: 0;
+    background: transparent;
+    color: transparent;
+    display: grid;
+    place-items: center;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+    transition: background .12s, color .12s;
+  }
+  .check:hover { background: #eaeae6; }
+  .check.checked { background: var(--black); color: var(--white); }
+
+  .task-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .task-name {
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1.35;
+    letter-spacing: -0.005em;
+    overflow-wrap: anywhere;
+  }
+  .task-done .task-name {
+    color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+  }
+
+  .task-due {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .task-due.overdue { color: var(--red); }
+  .task-done .task-due { display: none; }
+
+  .icon-btn {
+    flex: none;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: color .12s;
+  }
+  .icon-btn:hover { color: var(--black); }
+  .icon-btn.del { font-size: 18px; font-weight: 400; }
+  .icon-btn.del:hover { color: var(--red); }
+
+  /* ---------- Empty ---------- */
+  .empty { padding: 56px 0 40px; }
+  .empty-icon { display: none; }
+  .empty-title {
+    margin: 0 0 8px;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+  .empty-text {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--muted);
+    max-width: 34ch;
+  }
+
+  /* ---------- FAB ---------- */
+  .fab {
+    position: fixed;
+    right: 20px;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    width: 58px;
+    height: 58px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: var(--red);
+    color: var(--white);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    z-index: 40;
+    transition: transform .12s ease, opacity .2s ease, background .15s;
+  }
+  .fab:hover { background: var(--black); }
+  .fab:active { transform: scale(.94); }
+  .fab.hidden { opacity: 0; pointer-events: none; transform: scale(.7); }
+
+  /* ---------- Backdrop ---------- */
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,10,10,.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+    z-index: 50;
+  }
+  .backdrop.open { opacity: 1; pointer-events: auto; }
+
+  /* ---------- Sheet ---------- */
+  .sheet {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 60;
+    background: var(--white);
+    border-top: 2px solid var(--black);
+    padding: 26px 20px calc(28px + env(safe-area-inset-bottom));
+    max-height: 92dvh;
+    overflow-y: auto;
+    transform: translateY(110%);
+    transition: transform .28s cubic-bezier(.32,.72,0,1);
+  }
+  .sheet.open { transform: translateY(0); }
+
+  .grip { display: none; }
+
+  #sheet-title {
+    margin: 0 0 26px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--black);
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.025em;
+    text-transform: uppercase;
+  }
+
+  .field { margin-bottom: 22px; }
+  .field[hidden] { display: none; }
+
+  .field-label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--black);
+  }
+
+  #task-name,
+  #task-due {
+    width: 100%;
+    padding: 12px 0;
+    border: none;
+    border-bottom: 1.5px solid var(--black);
+    border-radius: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 22px;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    color: var(--black);
+    outline: none;
+    transition: border-color .15s;
+  }
+  #task-name::placeholder { color: #b8b8b4; }
+  #task-name:focus,
+  #task-due:focus { border-bottom-color: var(--red); }
+
+  #task-due {
+    font-size: 18px;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .seg {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 1.5px solid var(--black);
+  }
+  .seg button {
+    appearance: none;
+    padding: 14px 10px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--black);
+    cursor: pointer;
+    transition: background .12s, color .12s;
+  }
+  .seg button:first-child { border-right: 1.5px solid var(--black); }
+  .seg button[aria-pressed="true"] { background: var(--black); color: var(--white); }
+
+  .preview {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 22px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .preview b { color: var(--black); font-weight: 700; }
+  .preview-dot { width: 8px; height: 8px; flex: none; }
+
+  .submit {
+    width: 100%;
+    padding: 18px;
+    border: none;
+    border-radius: 0;
+    background: var(--black);
+    color: var(--white);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .submit:hover { background: var(--red); }
+  .submit:active { transform: translateY(1px); }
+
+  /* ---------- Móvil ---------- */
+  @media (max-width: 640px) {
+    .bg-image { width: 180px; opacity: 0.35; }
+  }
+
+  /* ---------- Desktop ---------- */
+  @media (min-width: 640px) {
+    .sheet {
+      left: 50%;
+      right: auto;
+      bottom: auto;
+      top: 50%;
+      width: 460px;
+      max-height: 88vh;
+      border: 1.5px solid var(--black);
+      border-radius: 0;
+      padding: 30px;
+      transform: translate(-50%, -46%) scale(.97);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform .2s ease, opacity .2s ease;
+    }
+    .sheet.open {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+</head>
+<body>
+
+
+
+<header class="app-header">
+  <div class="header-meta">
+    <span>Matriz de Eisenhower</span>
+    <span class="mark" aria-hidden="true"></span>
+  </div>
+
+  <h1>Mis<br>tareas</h1>
+
+  <div class="tabs" role="tablist">
+    <button type="button" data-tab="pending" aria-pressed="true">
+      Pendientes <span class="badge" id="badge-pending">0</span>
+    </button>
+    <button type="button" data-tab="completed" aria-pressed="false">
+      Completadas <span class="badge" id="badge-completed">0</span>
+    </button>
+  </div>
+</header>
+
+<main id="board"></main>
+
+<button class="fab" id="fab" aria-label="Agregar tarea">
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+       stroke="currentColor" stroke-width="2.4" stroke-linecap="square" aria-hidden="true">
+    <path d="M12 4v16M4 12h16"/>
+  </svg>
+</button>
+
+<div class="backdrop" id="backdrop"></div>
+
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+  <div class="grip"></div>
+  <h2 id="sheet-title">Nueva tarea</h2>
+
+  <form id="task-form" novalidate>
+    <div class="field">
+      <label class="field-label" for="task-name">Tarea</label>
+      <input id="task-name" type="text" placeholder="Escribe el nombre"
+             autocomplete="off" maxlength="120" enterkeyhint="done">
+    </div>
+
+    <div class="field">
+      <span class="field-label">Importancia</span>
+      <div class="seg" data-group="important">
+        <button type="button" data-value="true"  aria-pressed="true">Importante</button>
+        <button type="button" data-value="false" aria-pressed="false">No importante</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="field-label">Urgencia</span>
+      <div class="seg" data-group="urgent">
+        <button type="button" data-value="true"  aria-pressed="true">Urgente</button>
+        <button type="button" data-value="false" aria-pressed="false">No urgente</button>
+      </div>
+    </div>
+
+    <div class="field" id="field-due" hidden>
+      <label class="field-label" for="task-due">Fecha límite</label>
+      <input id="task-due" type="date">
+    </div>
+
+    <p class="preview" id="preview"></p>
+
+    <button class="submit" id="submit-btn" type="submit">Agregar tarea</button>
+  </form>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var API = '/api/tasks';
+
+  var QUADRANTS = [
+    { important: true,  urgent: true,  title: 'Hacer ahora', color: '#e30613' },  // rojo
+    { important: true,  urgent: false, title: 'Planificar',  color: '#0a0a0a' },  // negro
+    { important: false, urgent: true,  title: 'Delegar',     color: '#f5a524' },  // ámbar
+    { important: false, urgent: false, title: 'Eliminar',    color: '#8b93a7' }   // gris azulado
+  ];
+
+  var MONTHS = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+
+  var board       = document.getElementById('board');
+  var fab         = document.getElementById('fab');
+  var sheet       = document.getElementById('sheet');
+  var sheetTitle  = document.getElementById('sheet-title');
+  var submitBtn   = document.getElementById('submit-btn');
+  var backdrop    = document.getElementById('backdrop');
+  var form        = document.getElementById('task-form');
+  var nameInput   = document.getElementById('task-name');
+  var dueInput    = document.getElementById('task-due');
+  var dueField    = document.getElementById('field-due');
+  var preview     = document.getElementById('preview');
+  var badgePend   = document.getElementById('badge-pending');
+  var badgeComp   = document.getElementById('badge-completed');
+  var tabButtons  = document.querySelectorAll('.tabs button');
+
+  var tasks = [];
+  var draft = { important: true, urgent: true };
+  var activeTab = 'pending';
+  var editingId = null;
+
+  /* ---------- API ---------- */
+
+  function fetchTasks() {
+    return fetch(API)
+      .then(function (res) {
+        if (!res.ok) throw new Error('Error al cargar tareas');
+        return res.json();
+      })
+      .then(function (data) {
+        tasks = data;
+        render();
+      });
+  }
+
+  function saveTask(payload, id) {
+    var url = id ? API + '/' + id : API;
+    var method = id ? 'PATCH' : 'POST';
+    return fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (res) {
+      if (!res.ok) throw new Error('Error al guardar la tarea');
+      return fetchTasks();
+    });
+  }
+
+  function toggleCompleted(id, completed) {
+    return fetch(API + '/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed: completed })
+    }).then(function (res) {
+      if (!res.ok) throw new Error('Error al actualizar tarea');
+      return fetchTasks();
+    });
+  }
+
+  function deleteTask(id) {
+    return fetch(API + '/' + id, { method: 'DELETE' }).then(function (res) {
+      if (!res.ok && res.status !== 204) throw new Error('Error al eliminar');
+      return fetchTasks();
+    });
+  }
+
+  /* ---------- Helpers ---------- */
+
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  // Trabajan con strings YYYY-MM-DD para no perder un día por zona horaria
+  function formatDate(iso) {
+    if (!iso) return '';
+    var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return '';
+    var day = m[3];
+    var monthIdx = parseInt(m[2], 10) - 1;
+    var year = m[1];
+    return day + ' ' + MONTHS[monthIdx] + ' ' + year;
+  }
+
+  function toInputDate(iso) {
+    if (!iso) return '';
+    var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return '';
+    return m[1] + '-' + m[2] + '-' + m[3];
+  }
+
+  function isOverdue(iso) {
+    if (!iso) return false;
+    var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return false;
+    var dueStr = m[1] + '-' + m[2] + '-' + m[3];
+
+    var today = new Date();
+    var todayStr =
+      today.getFullYear() + '-' +
+      String(today.getMonth() + 1).padStart(2, '0') + '-' +
+      String(today.getDate()).padStart(2, '0');
+
+    return dueStr < todayStr;
+  }
+
+  function makeTaskCard(t) {
+    var card = el('article', 'task' + (t.completed ? ' task-done' : ''));
+
+    // Check
+    var check = el('button', 'check' + (t.completed ? ' checked' : ''));
+    check.type = 'button';
+    check.setAttribute('aria-label', t.completed ? 'Marcar como pendiente' : 'Marcar como completada');
+    check.setAttribute('aria-pressed', String(t.completed));
+    check.textContent = t.completed ? '✓' : '';
+    check.addEventListener('click', function () {
+      toggleCompleted(t.id, !t.completed).catch(function () {
+        alert('No se pudo actualizar la tarea');
+      });
+    });
+    card.appendChild(check);
+
+    // Body: nombre + fecha apilados
+    var body = el('div', 'task-body');
+    body.appendChild(el('span', 'task-name', t.name));
+
+    if (t.dueDate) {
+      var dueCls = 'task-due' + (isOverdue(t.dueDate) && !t.completed ? ' overdue' : '');
+      body.appendChild(el('span', dueCls, formatDate(t.dueDate)));
+    }
+
+    card.appendChild(body);
+
+    // Edit
+    var edit = el('button', 'icon-btn edit');
+    edit.type = 'button';
+    edit.setAttribute('aria-label', 'Editar tarea');
+    edit.innerHTML =
+      '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" ' +
+      'stroke="currentColor" stroke-width="1.8" stroke-linecap="square" aria-hidden="true">' +
+      '<path d="M4 20h4L20 8l-4-4L4 16v4z"/>' +
+      '<path d="M14 6l4 4"/>' +
+      '</svg>';
+    edit.addEventListener('click', function () { openSheet(t); });
+    card.appendChild(edit);
+
+    // Delete
+    var del = el('button', 'icon-btn del', '×');
+    del.type = 'button';
+    del.setAttribute('aria-label', 'Eliminar tarea');
+    del.addEventListener('click', function () {
+      deleteTask(t.id).catch(function () {
+        alert('No se pudo eliminar la tarea');
+      });
+    });
+    card.appendChild(del);
+
+    return card;
+  }
+
+  function showEmpty(icon, title, text) {
+    var wrap = el('div', 'empty');
+    wrap.appendChild(el('div', 'empty-icon', icon));
+    wrap.appendChild(el('p', 'empty-title', title));
+    wrap.appendChild(el('p', 'empty-text', text));
+    board.appendChild(wrap);
+  }
+
+  /* ---------- Render ---------- */
+
+  function render() {
+    board.textContent = '';
+
+    var pending = tasks.filter(function (t) { return !t.completed; });
+    var completed = tasks.filter(function (t) { return t.completed; })
+      .sort(function (a, b) {
+        return new Date(b.completedAt || 0) - new Date(a.completedAt || 0);
+      });
+
+    badgePend.textContent = String(pending.length).padStart(2, '0');
+    badgeComp.textContent = String(completed.length).padStart(2, '0');
+
+    if (activeTab === 'pending') {
+      fab.classList.remove('hidden');
+    } else {
+      fab.classList.add('hidden');
+    }
+
+    if (activeTab === 'pending') {
+      if (pending.length === 0) {
+        showEmpty('', 'Sin pendientes',
+          'Toca el botón rojo de la esquina inferior derecha para agregar una nueva tarea.');
+        return;
+      }
+
+      QUADRANTS.forEach(function (q) {
+        var items = pending.filter(function (t) {
+          return t.important === q.important && t.urgent === q.urgent;
+        });
+        if (items.length === 0) return;
+
+        // Planificar: ordenar por fecha, de más próxima a más lejana.
+        // Las tareas sin fecha van al final.
+        if (q.important === true && q.urgent === false) {
+          items.sort(function (a, b) {
+            if (!a.dueDate && !b.dueDate) return 0;
+            if (!a.dueDate) return 1;
+            if (!b.dueDate) return -1;
+            if (a.dueDate < b.dueDate) return -1;
+            if (a.dueDate > b.dueDate) return 1;
+            return 0;
+          });
+        }
+
+        var section = el('section', 'quadrant');
+        section.style.setProperty('--qc', q.color);
+
+        var head = el('div', 'q-head');
+        head.appendChild(el('span', 'q-dot'));
+        head.appendChild(el('span', 'q-title', q.title));
+        head.appendChild(el('span', 'q-count', String(items.length).padStart(2, '0')));
+        section.appendChild(head);
+
+        var list = el('div', 'q-list');
+        items.forEach(function (t) { list.appendChild(makeTaskCard(t)); });
+        section.appendChild(list);
+        board.appendChild(section);
+      });
+      return;
+    }
+
+    if (completed.length === 0) {
+      showEmpty('', 'Sin completadas',
+        'Las tareas que marques como hechas aparecerán aquí.');
+      return;
+    }
+
+    var section = el('section', 'quadrant');
+    section.style.setProperty('--qc', '#22a06b'); // verde para completadas
+
+    var head = el('div', 'completed-head');
+    head.appendChild(el('span', 'q-dot'));
+    head.appendChild(el('span', 'q-title', 'Completadas'));
+    head.appendChild(el('span', 'q-count', String(completed.length).padStart(2, '0')));
+    section.appendChild(head);
+
+    var list = el('div', 'completed-list');
+    completed.forEach(function (t) { list.appendChild(makeTaskCard(t)); });
+    section.appendChild(list);
+    board.appendChild(section);
+  }
+
+  /* ---------- Tabs ---------- */
+
+  Array.prototype.forEach.call(tabButtons, function (btn) {
+    btn.addEventListener('click', function () {
+      if (btn.dataset.tab === activeTab) return;
+      activeTab = btn.dataset.tab;
+      Array.prototype.forEach.call(tabButtons, function (b) {
+        b.setAttribute('aria-pressed', String(b.dataset.tab === activeTab));
+      });
+      render();
+    });
+  });
+
+  /* ---------- Formulario ---------- */
+
+  function isPlanificar() {
+    return draft.important === true && draft.urgent === false;
+  }
+
+  function currentQuadrant() {
+    for (var i = 0; i < QUADRANTS.length; i++) {
+      var q = QUADRANTS[i];
+      if (q.important === draft.important && q.urgent === draft.urgent) return q;
+    }
+    return QUADRANTS[0];
+  }
+
+  function updatePreview() {
+    var q = currentQuadrant();
+    preview.textContent = '';
+
+    var dot = el('span', 'preview-dot');
+    dot.style.background = q.color;
+
+    var text = el('span');
+    text.appendChild(document.createTextNode('Se guardará en '));
+    var strong = el('b', null, q.title);
+    text.appendChild(strong);
+
+    preview.appendChild(dot);
+    preview.appendChild(text);
+  }
+
+  function updateDueFieldVisibility() {
+    dueField.hidden = !isPlanificar();
+  }
+
+  function syncSegments() {
+    var segs = document.querySelectorAll('.seg');
+    Array.prototype.forEach.call(segs, function (seg) {
+      var group = seg.dataset.group;
+      var buttons = seg.querySelectorAll('button');
+      Array.prototype.forEach.call(buttons, function (btn) {
+        var value = btn.dataset.value === 'true';
+        btn.setAttribute('aria-pressed', String(value === draft[group]));
+      });
+    });
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.seg'), function (seg) {
+    var group = seg.dataset.group;
+    seg.addEventListener('click', function (e) {
+      var btn = e.target.closest('button');
+      if (!btn || !seg.contains(btn)) return;
+      draft[group] = btn.dataset.value === 'true';
+      syncSegments();
+      updateDueFieldVisibility();
+      updatePreview();
+    });
+  });
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = nameInput.value.trim();
+    if (!name) {
+      nameInput.focus();
+      return;
+    }
+
+    var due = isPlanificar() && dueInput.value ? dueInput.value : null;
+
+    var payload = {
+      name: name,
+      important: draft.important,
+      urgent: draft.urgent,
+      dueDate: due
+    };
+
+    saveTask(payload, editingId)
+      .then(function () { closeSheet(); })
+      .catch(function () { alert('No se pudo guardar la tarea. Intenta de nuevo.'); });
+  });
+
+  /* ---------- Abrir / cerrar ---------- */
+
+  function openSheet(task) {
+    if (task) {
+      editingId = task.id;
+      sheetTitle.textContent = 'Editar tarea';
+      submitBtn.textContent = 'Guardar cambios';
+
+      nameInput.value = task.name;
+      draft.important = !!task.important;
+      draft.urgent = !!task.urgent;
+      dueInput.value = toInputDate(task.dueDate);
+    } else {
+      editingId = null;
+      sheetTitle.textContent = 'Nueva tarea';
+      submitBtn.textContent = 'Agregar tarea';
+
+      nameInput.value = '';
+      draft.important = true;
+      draft.urgent = true;
+      dueInput.value = '';
+    }
+
+    syncSegments();
+    updateDueFieldVisibility();
+    updatePreview();
+
+    backdrop.classList.add('open');
+    sheet.classList.add('open');
+    document.body.classList.add('no-scroll');
+    window.setTimeout(function () { nameInput.focus(); }, 260);
+  }
+
+  function closeSheet() {
+    backdrop.classList.remove('open');
+    sheet.classList.remove('open');
+    document.body.classList.remove('no-scroll');
+
+    form.reset();
+    nameInput.value = '';
+    dueInput.value = '';
+    draft = { important: true, urgent: true };
+    editingId = null;
+
+    sheetTitle.textContent = 'Nueva tarea';
+    submitBtn.textContent = 'Agregar tarea';
+
+    syncSegments();
+    updateDueFieldVisibility();
+    updatePreview();
+  }
+
+  fab.addEventListener('click', function () { openSheet(null); });
+  backdrop.addEventListener('click', closeSheet);
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && sheet.classList.contains('open')) closeSheet();
+  });
+
+  /* ---------- Init ---------- */
+
+  syncSegments();
+  updateDueFieldVisibility();
+  updatePreview();
+
+  fetchTasks().catch(function () {
+    board.textContent = '';
+    showEmpty('', 'Error de conexión',
+      'No se pudieron cargar las tareas. Recarga la página.');
+  });
+})();
+</script>
+</body>
+</html>
